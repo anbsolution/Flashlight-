@@ -74,7 +74,7 @@ public class FlashlightWidgetProvider extends AppWidgetProvider {
     private void updateWidget(Context context, AppWidgetManager manager, int id) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.flashlight_widget);
         views.setTextViewText(R.id.widget_status, torchOn ? "TORCH ON" : "TORCH OFF");
-        views.setTextViewText(R.id.widget_power, torchOn ? "●" : "⚡");
+        views.setTextViewText(R.id.widget_power, "⚡");
 
         Intent toggle = new Intent(context, FlashlightWidgetProvider.class);
         toggle.setAction(ACTION_TOGGLE);
