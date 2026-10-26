@@ -14,7 +14,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <receiver
             android:name=".FlashlightWidgetProvider"
             android:label="ANB Flashlight"
@@ -24,9 +23,7 @@
                 <action android:name="com.anb.flashlight.WIDGET_TOGGLE" />
                 <action android:name="com.anb.flashlight.WIDGET_OPEN_APP" />
             </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/flashlight_widget_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/flashlight_widget_info" />
         </receiver>
     </application>
 </manifest>

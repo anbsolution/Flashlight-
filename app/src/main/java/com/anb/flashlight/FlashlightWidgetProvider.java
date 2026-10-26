@@ -17,17 +17,15 @@ public class FlashlightWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_OPEN = "com.anb.flashlight.WIDGET_OPEN_APP";
     private static boolean torchOn = false;
 
-    @Override
-    public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
+    @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         for (int id : ids) updateWidget(context, manager, id);
     }
 
-    @Override
-    public void onReceive(Context context, Intent intent) {
+    @Override public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         String action = intent.getAction();
         if (ACTION_TOGGLE.equals(action)) {
-            if (android.os.Build.VERSION.SDK_INT >= 23 &&
+            if (Build.VERSION.SDK_INT >= 23 &&
                 context.checkSelfPermission(android.Manifest.permission.CAMERA)
                     != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 Intent open = new Intent(context, MainActivity.class);
@@ -39,7 +37,7 @@ public class FlashlightWidgetProvider extends AppWidgetProvider {
             updateAll(context);
         } else if (ACTION_OPEN.equals(action)) {
             Intent open = new Intent(context, MainActivity.class);
-            open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             context.startActivity(open);
         }
     }
@@ -51,9 +49,9 @@ public class FlashlightWidgetProvider extends AppWidgetProvider {
             String chosen = null;
             for (String id : cm.getCameraIdList()) {
                 CameraCharacteristics c = cm.getCameraCharacteristics(id);
-                Boolean hasFlash = c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
+                Boolean flash = c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 Integer facing = c.get(CameraCharacteristics.LENS_FACING);
-                if (Boolean.TRUE.equals(hasFlash) &&
+                if (Boolean.TRUE.equals(flash) &&
                     (facing == null || facing == CameraCharacteristics.LENS_FACING_BACK)) {
                     chosen = id;
                     break;
@@ -69,31 +67,27 @@ public class FlashlightWidgetProvider extends AppWidgetProvider {
 
     private void updateAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        ComponentName component = new ComponentName(context, FlashlightWidgetProvider.class);
-        int[] ids = manager.getAppWidgetIds(component);
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, FlashlightWidgetProvider.class));
         for (int id : ids) updateWidget(context, manager, id);
     }
 
     private void updateWidget(Context context, AppWidgetManager manager, int id) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.flashlight_widget);
         views.setTextViewText(R.id.widget_status, torchOn ? "TORCH ON" : "TORCH OFF");
-        views.setTextViewText(R.id.widget_power, torchOn ? "●" : "ϟ");
+        views.setTextViewText(R.id.widget_power, torchOn ? "●" : "⚡");
 
         Intent toggle = new Intent(context, FlashlightWidgetProvider.class);
         toggle.setAction(ACTION_TOGGLE);
         toggle.setData(android.net.Uri.parse("anbflashlight://toggle/" + id));
-        PendingIntent togglePi = PendingIntent.getBroadcast(
-            context, id, toggle,
+        PendingIntent togglePi = PendingIntent.getBroadcast(context, id, toggle,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_power, togglePi);
 
         Intent open = new Intent(context, MainActivity.class);
-        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent openPi = PendingIntent.getActivity(
-            context, id + 5000, open,
+        open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent openPi = PendingIntent.getActivity(context, id + 5000, open,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_open, openPi);
-
         manager.updateAppWidget(id, views);
     }
 }
