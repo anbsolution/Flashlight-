@@ -25,7 +25,7 @@ public class MainActivity extends Activity {
     private CameraManager cameraManager;
     private String cameraId;
     private boolean torchOn = false;
-    private int strengthTarget = 100;
+    private int strengthTarget = 100; // 0 = off, 100 = default LED, 200 = maximum supported LED level
     private int maxStrength = 1;
     private int defaultStrength = 1;
     private TextView status, percent, ledButton;
@@ -79,14 +79,14 @@ public class MainActivity extends Activity {
         status.setGravity(Gravity.CENTER);
         root.addView(status);
 
-        percent = text("Brightness target: 100%", 17, Color.WHITE, true);
+        percent = text("Torch level: 100%", 17, Color.WHITE, true);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(28);
         root.addView(percent, p);
 
         slider = new SeekBar(this);
-        slider.setMax(100);
-        slider.setProgress(0);
+        slider.setMax(200);
+        slider.setProgress(100);
         if (Build.VERSION.SDK_INT >= 26) {
             slider.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(163, 230, 53)));
             slider.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.rgb(163, 230, 53)));
@@ -94,11 +94,22 @@ public class MainActivity extends Activity {
         root.addView(slider, new LinearLayout.LayoutParams(-1, -2));
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
-                strengthTarget = 100 + progress;
-                percent.setText("Brightness target: " + strengthTarget + "%");
-                if (fromUser && torchOn) applyStrength();
-                if (fromUser && (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength)) {
-                    status.setText("This phone does not expose adjustable LED intensity; target cannot increase hardware output.");
+                strengthTarget = progress;
+                percent.setText("Torch level: " + strengthTarget + "%");
+                if (!fromUser) return;
+                if (strengthTarget == 0) {
+                    turnTorchOff();
+                } else if (torchOn) {
+                    applyStrength();
+                } else {
+                    status.setText("Selected " + strengthTarget + "% • tap the torch button to turn it on");
+                }
+                if (fromUser && (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength) && strengthTarget > 100) {
+                    status.setText("This phone cannot increase LED output above its normal hardware level.");
+                }
+                if (fromUser && strengthTarget > 0 && strengthTarget <= 100 &&
+                    (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength)) {
+                    status.setText("This phone supports LED on/off only; levels 1–100% cannot be physically dimmed.");
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar s) {}
@@ -106,7 +117,7 @@ public class MainActivity extends Activity {
         });
 
         TextView note = text(
-            "100% = this phone's normal LED level. 200% = request for the highest supported LED level, not a guarantee of double light.",
+            "0% = OFF • 100% = normal LED level • 200% = request maximum supported LED level. Actual brightness depends on phone hardware.",
             12, Color.rgb(180, 190, 200), false);
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, -2);
@@ -187,11 +198,11 @@ public class MainActivity extends Activity {
                         if (def != null) defaultStrength = Math.max(1, Math.min(maxStrength, def));
                     }
                     boolean adjustable = Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength;
-                    slider.setEnabled(adjustable);
-                    slider.setAlpha(adjustable ? 1f : 0.55f);
+                    slider.setEnabled(true);
+                    slider.setAlpha(1f);
                     status.setText(adjustable
                         ? "LED ready • normal level " + defaultStrength + ", maximum " + maxStrength
-                        : "LED ready • this phone does not report extra LED intensity levels");
+                        : "LED ready • on/off supported; adjustable intensity may not be available");
                     return;
                 }
             }
@@ -206,6 +217,7 @@ public class MainActivity extends Activity {
 
     private int targetStrengthLevel() {
         if (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength) return defaultStrength;
+        if (strengthTarget <= 100) return defaultStrength;
         float fraction = (strengthTarget - 100) / 100f;
         int level = Math.round(defaultStrength + fraction * (maxStrength - defaultStrength));
         return Math.max(defaultStrength, Math.min(maxStrength, level));
@@ -215,6 +227,11 @@ public class MainActivity extends Activity {
         if (cameraId == null) {
             toast("This phone does not report a usable LED flash.");
             return;
+        }
+        if (strengthTarget == 0) {
+            strengthTarget = 100;
+            slider.setProgress(100);
+            percent.setText("Torch level: 100%");
         }
         if (!torchOn && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, 10);
@@ -227,16 +244,7 @@ public class MainActivity extends Activity {
                 ledButton.setText("⚡");
                 status.setText("LED torch OFF");
             } else {
-                if (Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength) {
-                    cameraManager.turnOnTorchWithStrengthLevel(cameraId, targetStrengthLevel());
-                } else {
-                    cameraManager.setTorchMode(cameraId, true);
-                }
-                torchOn = true;
-                ledButton.setText("●");
-                status.setText(Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength
-                    ? "LED ON • requested hardware level " + targetStrengthLevel() + "/" + maxStrength
-                    : "LED ON • normal hardware output; intensity adjustment unavailable");
+                turnTorchOnAtTarget();
             }
         } catch (Exception e) {
             toast("Torch could not start. Close other camera apps and try again.");
@@ -244,14 +252,55 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void applyStrength() {
-        if (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength || cameraId == null) return;
-        try {
-            cameraManager.turnOnTorchWithStrengthLevel(cameraId, targetStrengthLevel());
-            status.setText("LED ON • requested hardware level " + targetStrengthLevel() + "/" + maxStrength);
-        } catch (Exception e) {
-            status.setText("Intensity change rejected by phone hardware; current torch state may be unchanged.");
+    private void turnTorchOnAtTarget() throws CameraAccessException {
+        if (strengthTarget == 0) {
+            turnTorchOff();
+            return;
         }
+        if (Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength && strengthTarget > 100) {
+            cameraManager.turnOnTorchWithStrengthLevel(cameraId, targetStrengthLevel());
+        } else {
+            cameraManager.setTorchMode(cameraId, true);
+        }
+        torchOn = true;
+        ledButton.setText("●");
+        if (Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength && strengthTarget > 100) {
+            status.setText("LED ON • requested hardware level " + targetStrengthLevel() + "/" + maxStrength);
+        } else if (strengthTarget > 100) {
+            status.setText("LED ON • this phone cannot raise output above normal level");
+        } else {
+            status.setText("LED ON • requested level " + strengthTarget + "%; physical dimming depends on hardware");
+        }
+    }
+
+    private void applyStrength() {
+        if (strengthTarget == 0) {
+            turnTorchOff();
+            return;
+        }
+        if (cameraId == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength && strengthTarget > 100) {
+                cameraManager.turnOnTorchWithStrengthLevel(cameraId, targetStrengthLevel());
+                status.setText("LED ON • requested hardware level " + targetStrengthLevel() + "/" + maxStrength);
+            } else if (strengthTarget <= 100) {
+                // Android does not expose arbitrary sub-default torch levels through setTorchMode.
+                status.setText("LED ON • requested " + strengthTarget + "%; device may only support on/off");
+            } else {
+                status.setText("LED ON • intensity increase unsupported by this phone");
+            }
+        } catch (Exception e) {
+            status.setText("Phone rejected intensity change; hardware output may be unchanged.");
+        }
+    }
+
+    private void turnTorchOff() {
+        try {
+            if (cameraId != null) cameraManager.setTorchMode(cameraId, false);
+        } catch (Exception ignored) {}
+        torchOn = false;
+        ledButton.setText("⚡");
+        status.setText("Torch OFF • 0%");
     }
 
     private void showScreenFlash() {
@@ -299,11 +348,7 @@ public class MainActivity extends Activity {
         if (strobeRunning) {
             strobeRunning = false;
             if (strobeTask != null) handler.removeCallbacks(strobeTask);
-            if (torchOn && cameraId != null) {
-                try { cameraManager.setTorchMode(cameraId, false); } catch (Exception ignored) {}
-                torchOn = false;
-                ledButton.setText("⚡");
-            }
+            turnTorchOff();
             status.setText("Strobe stopped");
             return;
         }
