@@ -1,6 +1,9 @@
 package com.anb.flashlight;
 
 import android.Manifest;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.pm.PackageManager;
@@ -15,6 +18,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -33,6 +37,7 @@ public class MainActivity extends Activity {
     private SeekBar slider;
     private View screenFlash;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private AnimatorSet pulseAnimator;
     private boolean strobeRunning = false;
     private Runnable strobeTask;
 
@@ -252,6 +257,45 @@ public class MainActivity extends Activity {
 
         scroll.addView(root);
         setContentView(scroll);
+        animateEntrance(toolbar, 0);
+        animateEntrance(title, 70);
+        animateEntrance(hero, 130);
+        animateEntrance(lightChoices, 190);
+        animateEntrance(sliderCard, 250);
+        animateEntrance(modes, 310);
+        animateEntrance(utilityRow, 370);
+    }
+
+    private void animateEntrance(View view, long delay) {
+        view.setAlpha(0f);
+        view.setTranslationY(dp(10));
+        view.animate().alpha(1f).translationY(0f).setStartDelay(delay)
+            .setDuration(320).setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    private void startTorchPulse() {
+        stopTorchPulse();
+        if (ledButton == null) return;
+        ObjectAnimator sx = ObjectAnimator.ofFloat(ledButton, "scaleX", 1f, 1.045f, 1f);
+        ObjectAnimator sy = ObjectAnimator.ofFloat(ledButton, "scaleY", 1f, 1.045f, 1f);
+        sx.setRepeatCount(ValueAnimator.INFINITE);
+        sy.setRepeatCount(ValueAnimator.INFINITE);
+        sx.setRepeatMode(ValueAnimator.RESTART);
+        sy.setRepeatMode(ValueAnimator.RESTART);
+        sx.setDuration(1050);
+        sy.setDuration(1050);
+        pulseAnimator = new AnimatorSet();
+        pulseAnimator.playTogether(sx, sy);
+        pulseAnimator.setInterpolator(new DecelerateInterpolator());
+        pulseAnimator.start();
+    }
+
+    private void stopTorchPulse() {
+        if (pulseAnimator != null) {
+            pulseAnimator.cancel();
+            pulseAnimator = null;
+        }
+        if (ledButton != null) ledButton.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
     }
 
     private String modeNamesForValue(int value) {
@@ -366,7 +410,7 @@ public class MainActivity extends Activity {
         try {
             if (torchOn) {
                 cameraManager.setTorchMode(cameraId, false);
-                torchOn = false; ledButton.setText("⚡"); ledButton.setTextColor(Color.rgb(163,230,53)); ledButton.setBackground(roundBg(Color.rgb(13,39,57), dp(100))); status.setText("LED torch OFF");
+                torchOn = false; stopTorchPulse(); ledButton.setText("⚡"); ledButton.setTextColor(Color.rgb(163,230,53)); ledButton.setBackground(roundBg(Color.rgb(13,39,57), dp(100))); status.setText("LED torch OFF");
             } else {
                 if (Build.VERSION.SDK_INT >= 33 && maxStrength > 1) {
                     int level;
@@ -379,7 +423,7 @@ public class MainActivity extends Activity {
                     level = Math.max(1, Math.min(maxStrength, level));
                     cameraManager.turnOnTorchWithStrengthLevel(cameraId, level);
                 } else cameraManager.setTorchMode(cameraId, true);
-                torchOn = true; ledButton.setText("⚡"); ledButton.setTextColor(Color.WHITE); ledButton.setBackground(roundBg(Color.rgb(24,75,55), dp(100))); status.setText("LED torch ON • hardware limit applies");
+                torchOn = true; ledButton.setText("⚡"); ledButton.setTextColor(Color.WHITE); ledButton.setBackground(roundBg(Color.rgb(24,75,55), dp(100))); startTorchPulse(); status.setText("LED torch ON • hardware limit applies");
             }
         } catch (Exception e) {
             toast("Torch could not start. Close other camera apps and try again.");
@@ -392,6 +436,7 @@ public class MainActivity extends Activity {
             if (cameraId != null && torchOn) cameraManager.setTorchMode(cameraId, false);
         } catch (Exception ignored) {}
         torchOn = false;
+        stopTorchPulse();
         if (ledButton != null) {
             ledButton.setText("⚡");
             ledButton.setTextColor(Color.rgb(163,230,53));
@@ -481,5 +526,7 @@ public class MainActivity extends Activity {
         if (strobeTask != null) handler.removeCallbacks(strobeTask);
         try { if (torchOn && cameraId != null) cameraManager.setTorchMode(cameraId, false); } catch (Exception ignored) {}
         torchOn = false;
+        stopTorchPulse();
+        if (status != null) status.setText("LED torch OFF • app paused");
     }
 }
