@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
         sliderHeader.setGravity(Gravity.CENTER_VERTICAL);
         TextView bolt = text("ϟ", 25, lime, true);
         sliderHeader.addView(bolt);
-        percent = text("LED request: 100%", 17, Color.WHITE, true);
+        percent = text("LED level: 100%", 17, Color.WHITE, true);
         LinearLayout.LayoutParams percentP = new LinearLayout.LayoutParams(0, -2, 1);
         percentP.leftMargin = dp(8);
         sliderHeader.addView(percent, percentP);
@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
         }
         sliderCard.addView(marks);
 
-        TextView note = text("Hardware-aware control • Actual LED output depends on your phone. Android 12 typically supports LED ON/OFF only; unsupported boost levels do not increase physical brightness.", 11, muted, false);
+        TextView note = text("STANDARD LED MODE • Your phone controls the LED at its supported output. High/Ultra/Max boost needs compatible hardware. Use Screen Light for adjustable display brightness.", 11, muted, false);
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams noteP = new LinearLayout.LayoutParams(-1, -2);
         noteP.topMargin = dp(10);
@@ -182,7 +182,7 @@ public class MainActivity extends Activity {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
                 strength = progress;
-                percent.setText("LED request: " + strength + "%");
+                percent.setText("LED level: " + strength + "%");
                 if (!fromUser) return;
                 boolean adjustable = Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength;
                 if (strength == 0) {
@@ -190,9 +190,9 @@ public class MainActivity extends Activity {
                 } else if (torchOn) {
                     applyStrength();
                 } else if (!adjustable && strength > 100) {
-                    status.setText("Boost unsupported by this phone • normal LED output only");
+                    status.setText("LED level selected • standard output");
                 } else if (!adjustable && strength < 100) {
-                    status.setText("LED is ON/OFF only • this value does not physically dim the LED");
+                    status.setText("LED level selected • standard output");
                 } else {
                     status.setText("Selected " + strength + "% request • tap LED to switch on");
                 }
@@ -222,12 +222,12 @@ public class MainActivity extends Activity {
             mode.setOnClickListener(v -> {
                 strength = target;
                 slider.setProgress(target);
-                percent.setText("LED request: " + target + "%");
+                percent.setText("LED level: " + target + "%");
                 if (target > 100 && !(Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength)) {
-                    status.setText("Mode selected • hardware boost unavailable; LED remains at normal output");
+                    status.setText(modeNamesForValue(target) + " selected • standard output");
                 } else {
                     status.setText(modeNamesForValue(target) + " mode selected");
-                    if (torchOn) applyStrength();
+                    if (torchOn) { applyStrength(); if (!(Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength)) status.setText("LED torch ON • standard output"); }
                 }
             });
             LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, dp(48), 1);
@@ -423,7 +423,7 @@ public class MainActivity extends Activity {
                     level = Math.max(1, Math.min(maxStrength, level));
                     cameraManager.turnOnTorchWithStrengthLevel(cameraId, level);
                 } else cameraManager.setTorchMode(cameraId, true);
-                torchOn = true; ledButton.setText("⚡"); ledButton.setTextColor(Color.WHITE); ledButton.setBackground(roundBg(Color.rgb(24,75,55), dp(100))); startTorchPulse(); status.setText("LED torch ON • hardware limit applies");
+                torchOn = true; ledButton.setText("⚡"); ledButton.setTextColor(Color.WHITE); ledButton.setBackground(roundBg(Color.rgb(24,75,55), dp(100))); startTorchPulse(); status.setText(Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength ? "LED torch ON • intensity control active" : "LED torch ON • standard output");
             }
         } catch (Exception e) {
             toast("Torch could not start. Close other camera apps and try again.");
