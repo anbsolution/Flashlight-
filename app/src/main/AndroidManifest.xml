@@ -3,7 +3,9 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:allowBackup="false"
-        android:label="ANB Flashlight Ultra 200%"
+        android:label="ANB Flashlight Ultra 200"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
@@ -12,5 +14,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".FlashlightWidgetProvider"
+            android:label="ANB Flashlight"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.anb.flashlight.WIDGET_TOGGLE" />
+                <action android:name="com.anb.flashlight.WIDGET_OPEN_APP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/flashlight_widget_info" />
+        </receiver>
     </application>
 </manifest>
