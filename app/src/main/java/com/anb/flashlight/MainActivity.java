@@ -79,7 +79,7 @@ public class MainActivity extends Activity {
         status.setGravity(Gravity.CENTER);
         root.addView(status);
 
-        percent = text("Torch level: 100%", 17, Color.WHITE, true);
+        percent = text("LED request: 100%", 17, Color.WHITE, true);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(28);
         root.addView(percent, p);
@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
                 strengthTarget = progress;
-                percent.setText("Torch level: " + strengthTarget + "%");
+                percent.setText("LED request: " + strengthTarget + "%");
                 if (!fromUser) return;
                 if (strengthTarget == 0) {
                     turnTorchOff();
@@ -105,11 +105,11 @@ public class MainActivity extends Activity {
                     status.setText("Selected " + strengthTarget + "% • tap the torch button to turn it on");
                 }
                 if (fromUser && (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength) && strengthTarget > 100) {
-                    status.setText("This phone cannot increase LED output above its normal hardware level.");
+                    status.setText("Hardware boost unavailable: LED output stays at normal level on this phone.");
                 }
                 if (fromUser && strengthTarget > 0 && strengthTarget <= 100 &&
                     (Build.VERSION.SDK_INT < 33 || maxStrength <= defaultStrength)) {
-                    status.setText("This phone supports LED on/off only; levels 1–100% cannot be physically dimmed.");
+                    status.setText("LED is ON/OFF only on this phone; slider values do not physically dim the LED.");
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar s) {}
@@ -117,7 +117,7 @@ public class MainActivity extends Activity {
         });
 
         TextView note = text(
-            "0% = OFF • 100% = normal LED level • 200% = request maximum supported LED level. Actual brightness depends on phone hardware.",
+            "LED slider is a hardware-level request, not a true dimmer. Android 12 phones usually support LED ON/OFF only; 200% boost needs compatible Android 13+ hardware. Use Screen Light for display light.",
             12, Color.rgb(180, 190, 200), false);
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, -2);
@@ -231,7 +231,7 @@ public class MainActivity extends Activity {
         if (strengthTarget == 0) {
             strengthTarget = 100;
             slider.setProgress(100);
-            percent.setText("Torch level: 100%");
+            percent.setText("LED request: 100%");
         }
         if (!torchOn && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, 10);
@@ -267,9 +267,9 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33 && maxStrength > defaultStrength && strengthTarget > 100) {
             status.setText("LED ON • requested hardware level " + targetStrengthLevel() + "/" + maxStrength);
         } else if (strengthTarget > 100) {
-            status.setText("LED ON • this phone cannot raise output above normal level");
+            status.setText("LED ON • hardware boost unsupported; output stays at normal level");
         } else {
-            status.setText("LED ON • requested level " + strengthTarget + "%; physical dimming depends on hardware");
+            status.setText("LED ON • this phone exposes ON/OFF only; requested percentage does not dim the LED");
         }
     }
 
@@ -285,9 +285,9 @@ public class MainActivity extends Activity {
                 status.setText("LED ON • requested hardware level " + targetStrengthLevel() + "/" + maxStrength);
             } else if (strengthTarget <= 100) {
                 // Android does not expose arbitrary sub-default torch levels through setTorchMode.
-                status.setText("LED ON • requested " + strengthTarget + "%; device may only support on/off");
+                status.setText("LED ON • ON/OFF-only hardware; requested percentage does not change LED output");
             } else {
-                status.setText("LED ON • intensity increase unsupported by this phone");
+                status.setText("LED ON • intensity boost unsupported; output remains normal");
             }
         } catch (Exception e) {
             status.setText("Phone rejected intensity change; hardware output may be unchanged.");
